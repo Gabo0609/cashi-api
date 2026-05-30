@@ -7,6 +7,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
+  passwordHash String
+  createdAt    DateTime      @default(now())
+
+  transactions Transaction[]
+}
+
 model Category {
   id           Int           @id @default(autoincrement())
   name         String
@@ -19,7 +28,14 @@ model Transaction {
   type        String
   description String?
   date        DateTime
-  categoryId  Int
+
+  receiptUrl String?
+  latitude   Float?
+  longitude  Float?
+
+  categoryId Int
+  userId     Int
 
   category Category @relation(fields: [categoryId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
 }
