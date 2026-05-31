@@ -1,4 +1,7 @@
 import type { Context } from "hono";
+import { writeFile, mkdir } from "node:fs/promises";
+import path from "node:path";
+import crypto from "node:crypto";
 import {
   createTransactionSchema,
   updateTransactionSchema,
@@ -109,17 +112,11 @@ export const getBalance = async (c: Context) => {
 
   const totalIncome = transactions
     .filter((transaction: any) => transaction.type === "income")
-    .reduce(
-      (total: number, transaction: any) => total + transaction.amount,
-      0
-    );
+    .reduce((total: number, transaction: any) => total + transaction.amount, 0);
 
   const totalExpense = transactions
     .filter((transaction: any) => transaction.type === "expense")
-    .reduce(
-      (total: number, transaction: any) => total + transaction.amount,
-      0
-    );
+    .reduce((total: number, transaction: any) => total + transaction.amount, 0);
 
   const balance = totalIncome - totalExpense;
 
@@ -127,5 +124,41 @@ export const getBalance = async (c: Context) => {
     totalIncome,
     totalExpense,
     balance,
+  });
+};
+
+export const uploadReceipt = async (c: Context) => {
+  const formData = await c.req.raw.formData();
+  const file = formData.get("receipt");
+
+  if (!file || typeof file === "string") {
+    return c.json({ message: "Receipt file is required" }, 400);
+  }
+
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+  if (!allowedTypes.includes(file.type)) {
+    return c.json({ message: "Only JPEG, PNG or WebP files are allowed" }, 400);
+  }
+
+  const maxSize = 5 * 1024 * 1024;
+
+  if (file.size > maxSize) {
+    return c.json({ message: "File size must be less than 5 MB" }, 400);
+  }
+
+  await mkdir("uploads", { recursive: true });
+
+  const extension = file.type === "image/jpeg" ? "jpg" : file.type.split("/")[1];
+  const filename = `${crypto.randomUUID()}.${extension}`;
+  const filepath = path.join("uploads", filename);
+
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  await writeFile(filepath, buffer);
+
+  return c.json({
+    receiptUrl: `/uploads/${filename}`,
   });
 };
