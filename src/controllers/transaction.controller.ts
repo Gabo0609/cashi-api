@@ -6,11 +6,17 @@ import {
 import { transactionRepository } from "../repositories/transaction.repository.js";
 
 export const getTransactions = async (c: Context) => {
-  const transactions = await transactionRepository.findAll();
+  const user = c.get("user") as any;
+
+  const transactions = await transactionRepository.findAllByUserId(
+    Number(user.id)
+  );
+
   return c.json(transactions);
 };
 
 export const getTransactionById = async (c: Context) => {
+  const user = c.get("user") as any;
   const id = Number(c.req.param("id"));
 
   const transaction = await transactionRepository.findById(id);
@@ -19,10 +25,15 @@ export const getTransactionById = async (c: Context) => {
     return c.json({ message: "Transaction not found" }, 404);
   }
 
+  if (transaction.userId !== Number(user.id)) {
+    return c.json({ message: "Forbidden" }, 403);
+  }
+
   return c.json(transaction);
 };
 
 export const createTransaction = async (c: Context) => {
+  const user = c.get("user") as any;
   const body = await c.req.json();
 
   const result = createTransactionSchema.safeParse(body);
@@ -31,12 +42,16 @@ export const createTransaction = async (c: Context) => {
     return c.json(result.error, 400);
   }
 
-  const transaction = await transactionRepository.create(result.data);
+  const transaction = await transactionRepository.create(
+    result.data,
+    Number(user.id)
+  );
 
   return c.json(transaction, 201);
 };
 
 export const updateTransaction = async (c: Context) => {
+  const user = c.get("user") as any;
   const id = Number(c.req.param("id"));
   const body = await c.req.json();
 
@@ -52,6 +67,10 @@ export const updateTransaction = async (c: Context) => {
     return c.json({ message: "Transaction not found" }, 404);
   }
 
+  if (transaction.userId !== Number(user.id)) {
+    return c.json({ message: "Forbidden" }, 403);
+  }
+
   const updatedTransaction = await transactionRepository.update(
     id,
     result.data
@@ -61,12 +80,17 @@ export const updateTransaction = async (c: Context) => {
 };
 
 export const deleteTransaction = async (c: Context) => {
+  const user = c.get("user") as any;
   const id = Number(c.req.param("id"));
 
   const transaction = await transactionRepository.findById(id);
 
   if (!transaction) {
     return c.json({ message: "Transaction not found" }, 404);
+  }
+
+  if (transaction.userId !== Number(user.id)) {
+    return c.json({ message: "Forbidden" }, 403);
   }
 
   await transactionRepository.delete(id);
@@ -77,7 +101,11 @@ export const deleteTransaction = async (c: Context) => {
 };
 
 export const getBalance = async (c: Context) => {
-  const transactions = await transactionRepository.findAll();
+  const user = c.get("user") as any;
+
+  const transactions = await transactionRepository.findAllByUserId(
+    Number(user.id)
+  );
 
   const totalIncome = transactions
     .filter((transaction: any) => transaction.type === "income")
@@ -100,4 +128,4 @@ export const getBalance = async (c: Context) => {
     totalExpense,
     balance,
   });
-};  
+};
