@@ -135,9 +135,18 @@ export const uploadReceipt = async (c: Context) => {
     return c.json({ message: "Receipt file is required" }, 400);
   }
 
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+  const originalName = file.name.toLowerCase();
+  const mimeType = file.type.toLowerCase();
 
-  if (!allowedTypes.includes(file.type)) {
+  const validMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+  const validExtensions = [".jpg", ".jpeg", ".png", ".webp"];
+
+  const hasValidMimeType = validMimeTypes.includes(mimeType);
+  const hasValidExtension = validExtensions.some((extension) =>
+    originalName.endsWith(extension)
+  );
+
+  if (!hasValidMimeType && !hasValidExtension) {
     return c.json({ message: "Only JPEG, PNG or WebP files are allowed" }, 400);
   }
 
@@ -149,7 +158,18 @@ export const uploadReceipt = async (c: Context) => {
 
   await mkdir("uploads", { recursive: true });
 
-  const extension = file.type === "image/jpeg" ? "jpg" : file.type.split("/")[1];
+  let extension = path.extname(originalName).replace(".", "");
+
+  if (!extension) {
+    if (mimeType === "image/jpeg") extension = "jpg";
+    if (mimeType === "image/png") extension = "png";
+    if (mimeType === "image/webp") extension = "webp";
+  }
+
+  if (extension === "jpeg") {
+    extension = "jpg";
+  }
+
   const filename = `${crypto.randomUUID()}.${extension}`;
   const filepath = path.join("uploads", filename);
 
