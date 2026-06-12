@@ -1,7 +1,15 @@
 import type { Context, Next } from "hono";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+
+  if (!secret) {
+    throw new Error("JWT_SECRET no está configurado");
+  }
+
+  return secret;
+};
 
 export const authMiddleware = async (c: Context, next: Next) => {
   const authHeader = c.req.header("Authorization");
@@ -10,10 +18,14 @@ export const authMiddleware = async (c: Context, next: Next) => {
     return c.json({ message: "Token required" }, 401);
   }
 
+  if (!authHeader.startsWith("Bearer ")) {
+    return c.json({ message: "Invalid authorization format" }, 401);
+  }
+
   const token = authHeader.replace("Bearer ", "");
 
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, getJwtSecret());
 
     c.set("user", payload);
 

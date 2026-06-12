@@ -4,7 +4,15 @@ import jwt from "jsonwebtoken";
 import { registerSchema, loginSchema } from "../schemas/auth.schema.js";
 import { userRepository } from "../repositories/user.repository.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+
+  if (!secret) {
+    throw new Error("JWT_SECRET no está configurado");
+  }
+
+  return secret;
+};
 
 export const register = async (c: Context) => {
   const body = await c.req.json();
@@ -30,7 +38,7 @@ export const register = async (c: Context) => {
       id: user.id,
       email: user.email,
     },
-    JWT_SECRET,
+    getJwtSecret(),
     {
       expiresIn: "1d",
     }
@@ -77,7 +85,7 @@ export const login = async (c: Context) => {
       id: user.id,
       email: user.email,
     },
-    JWT_SECRET,
+    getJwtSecret(),
     {
       expiresIn: "1d",
     }

@@ -12,7 +12,6 @@ model User {
   email        String        @unique
   passwordHash String
   createdAt    DateTime      @default(now())
-
   transactions Transaction[]
 }
 
@@ -28,14 +27,11 @@ model Transaction {
   type        String
   description String?
   date        DateTime
-
-  receiptUrl String?
-  latitude   Float?
-  longitude  Float?
-
-  categoryId Int
-  userId     Int
-
-  category Category @relation(fields: [categoryId], references: [id])
-  user     User     @relation(fields: [userId], references: [id])
+  categoryId  Int
+  latitude    Float?
+  longitude   Float?
+  receiptUrl  String?
+  userId      Int
+  category    Category @relation(fields: [categoryId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
 }

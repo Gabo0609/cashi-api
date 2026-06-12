@@ -1,12 +1,12 @@
 import type { Context } from "hono";
-import { writeFile, mkdir } from "node:fs/promises";
-import path from "node:path";
 import crypto from "node:crypto";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import {
   createTransactionSchema,
   updateTransactionSchema,
 } from "../schemas/transaction.schema.js";
 import { transactionRepository } from "../repositories/transaction.repository.js";
+import { r2 } from "../lib/r2.js";
 
 export const getTransactions = async (c: Context) => {
   const user = c.get("user") as any;
@@ -127,6 +127,16 @@ export const getBalance = async (c: Context) => {
   });
 };
 
+const getRequiredEnv = (name: string) => {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`${name} no está configurada`);
+  }
+
+  return value;
+};
+
 export const uploadReceipt = async (c: Context) => {
   const formData = await c.req.raw.formData();
   const file = formData.get("receipt");
@@ -156,9 +166,7 @@ export const uploadReceipt = async (c: Context) => {
     return c.json({ message: "File size must be less than 5 MB" }, 400);
   }
 
-  await mkdir("uploads", { recursive: true });
-
-  let extension = path.extname(originalName).replace(".", "");
+  let extension = originalName.split(".").pop() || "";
 
   if (!extension) {
     if (mimeType === "image/jpeg") extension = "jpg";
@@ -171,14 +179,23 @@ export const uploadReceipt = async (c: Context) => {
   }
 
   const filename = `${crypto.randomUUID()}.${extension}`;
-  const filepath = path.join("uploads", filename);
+  const key = `receipts/${filename}`;
 
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
-  await writeFile(filepath, buffer);
+  await r2.send(
+    new PutObjectCommand({
+      Bucket: getRequiredEnv("R2_BUCKET_NAME"),
+      Key: key,
+      Body: buffer,
+      ContentType: mimeType,
+    })
+  );
+
+  const publicUrl = getRequiredEnv("R2_PUBLIC_URL");
 
   return c.json({
-    receiptUrl: `/uploads/${filename}`,
+    receiptUrl: `${publicUrl}/${key}`,
   });
 };
