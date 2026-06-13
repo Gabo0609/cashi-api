@@ -1,155 +1,63 @@
-# Cashi API
+## Producción
 
-API REST para gestionar categorías, transacciones, autenticación de usuarios y comprobantes.
+La aplicación fue desplegada en Render como parte de la etapa final del proyecto.
 
-## Tecnologías
+URL pública de producción:
 
-* Node.js
-* TypeScript
-* Hono
-* Prisma
-* PostgreSQL
-* Docker Compose
-* JWT
-* bcryptjs
-* Zod
-* Bruno
+https://cashi-api-03az.onrender.com
 
-## Instalación
+El backend se encuentra conectado a una instancia PostgreSQL administrada por Render, permitiendo separar completamente el entorno de producción del entorno de desarrollo local.
 
-```bash
-npm install
-```
+Durante el despliegue se configuraron variables de entorno para la conexión a la base de datos, autenticación JWT y acceso a Cloudflare R2. Estas credenciales no se almacenan en el repositorio y son gestionadas directamente por la plataforma de despliegue.
 
-## Configuración y ejecución
+Las migraciones de Prisma fueron aplicadas sobre la base de datos de producción para garantizar que la estructura utilizada en desarrollo y producción sea consistente.
 
-Para ejecutar el proyecto es necesario crear un archivo `.env` en la raíz con las variables de entorno correspondientes. La conexión a la base de datos se configura mediante `DATABASE_URL`, mientras que la firma de los tokens JWT utiliza la variable `JWT_SECRET`.
+Además, el repositorio GitHub se encuentra conectado a Render, permitiendo realizar despliegues automáticos cada vez que se actualiza la rama principal del proyecto.
 
-```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/cashi"
-JWT_SECRET="dev_secret"
-```
+## Despliegue y almacenamiento
 
-La base de datos PostgreSQL se ejecuta mediante Docker Compose. Para iniciarla se debe ejecutar:
+Para la publicación del proyecto se utilizaron servicios cloud especializados.
 
-```bash
-docker compose up -d
-```
+### Render
 
-Una vez levantado el contenedor, se deben aplicar las migraciones de Prisma con:
+Render fue utilizado para:
 
-```bash
-npx prisma migrate dev
-```
+* Hospedar la API en producción.
+* Ejecutar la aplicación Node.js.
+* Administrar la base de datos PostgreSQL de producción.
+* Gestionar las variables de entorno necesarias para el funcionamiento de la aplicación.
+* Automatizar el proceso de despliegue mediante integración con GitHub.
 
-Finalmente, el servidor se inicia mediante:
+Gracias a esto la API quedó disponible públicamente mediante una URL accesible desde internet.
 
-```bash
-npm run dev
-```
+### PostgreSQL en la nube
 
-La API quedará disponible en:
+La base de datos utilizada en producción corresponde a una instancia PostgreSQL administrada por Render.
 
-```txt
-http://localhost:3000
-```
+Esta configuración elimina la dependencia de Docker local para el entorno productivo y permite que la información permanezca disponible incluso cuando el servidor es reiniciado o redeployado.
 
-## Autenticación
+### Cloudflare R2
 
-La API incorpora autenticación basada en JWT. Los usuarios pueden registrarse mediante el endpoint `POST /auth/register`, enviando un correo electrónico y una contraseña.
+Los comprobantes asociados a las transacciones se almacenan en Cloudflare R2 mediante almacenamiento de objetos compatible con Amazon S3.
 
-Ejemplo:
+Se creó un bucket denominado:
 
-```json
-{
-  "email": "gabo@test.com",
-  "password": "123456"
-}
-```
+cashi-receipts
 
-Posteriormente pueden autenticarse utilizando `POST /auth/login` con las mismas credenciales.
+Cuando un usuario carga una imagen mediante el endpoint:
 
-```json
-{
-  "email": "gabo@test.com",
-  "password": "123456"
-}
-```
-
-Como respuesta, el sistema genera un token JWT que debe enviarse en todas las rutas protegidas utilizando el encabezado:
-
-```txt
-Authorization: Bearer TOKEN
-```
-
-## Endpoints principales
-
-La API dispone de endpoints para la administración de categorías y transacciones.
-
-### Categorías
-
-* GET /categories
-* POST /categories
-* PATCH /categories/:id
-* DELETE /categories/:id
-
-### Transacciones
-
-* GET /transactions
-* GET /transactions/:id
-* POST /transactions
-* PATCH /transactions/:id
-* DELETE /transactions/:id
-* GET /transactions/balance
-
-Las transacciones están asociadas al usuario autenticado. El identificador del usuario no se envía desde el cliente, sino que se obtiene directamente desde el token JWT validado por el middleware de autenticación.
-
-## Carga de comprobantes
-
-El sistema permite adjuntar comprobantes mediante el endpoint:
-
-```txt
 POST /transactions/upload
-```
 
-La solicitud debe enviarse utilizando el formato `multipart/form-data` e incluir un archivo en el campo `receipt`.
+el archivo es enviado a Cloudflare R2 y posteriormente se devuelve una URL pública que puede asociarse a una transacción.
 
-Se aceptan únicamente archivos:
+Esta estrategia evita almacenar archivos dentro del servidor de aplicación y permite conservar los comprobantes incluso cuando la aplicación es desplegada nuevamente.
 
-* JPEG
-* PNG
-* WebP
+### Flujo de almacenamiento de comprobantes
 
-El tamaño máximo permitido es de 5 MB.
+1. El usuario envía una imagen mediante multipart/form-data.
+2. La API valida tipo y tamaño del archivo.
+3. El archivo es almacenado en Cloudflare R2.
+4. Se genera una URL pública.
+5. La URL es almacenada posteriormente junto a la transacción correspondiente.
 
-La respuesta entrega una URL local del archivo almacenado:
-
-```json
-{
-  "receiptUrl": "/uploads/nombre-del-archivo.jpg"
-}
-```
-
-Los comprobantes se almacenan localmente en la carpeta `uploads/`. En un entorno productivo se recomienda utilizar un servicio especializado de almacenamiento de objetos como Cloudflare R2 o Amazon S3.
-
-## Arquitectura
-
-El proyecto utiliza una arquitectura por capas organizada de la siguiente forma:
-
-```txt
-routes -> controllers -> repositories -> schemas
-```
-
-Las rutas definen los endpoints expuestos por la API. Los controladores contienen la lógica de negocio y las validaciones de ownership. Los repositorios encapsulan el acceso a datos utilizando Prisma. Los esquemas validan la información de entrada mediante Zod. Los middlewares gestionan funcionalidades transversales como la autenticación JWT.
-
-## Seguridad
-
-Las contraseñas se almacenan utilizando bcrypt para evitar guardar información sensible en texto plano. El sistema utiliza JWT para autenticar usuarios y proteger los endpoints privados. Todas las rutas protegidas requieren el encabezado `Authorization: Bearer TOKEN`.
-
-Además, se implementó validación de ownership para garantizar que un usuario solo pueda visualizar, modificar o eliminar sus propias transacciones. Cuando una transacción pertenece a otro usuario, la API responde con un código `403 Forbidden`.
-
-## Uso de Inteligencia Artificial
-
-Durante el desarrollo del proyecto se utilizó ChatGPT como herramienta de apoyo para comprender la estructura de la aplicación, implementar autenticación con JWT, revisar validaciones de ownership, desarrollar la funcionalidad de carga de comprobantes, preparar la documentación y realizar pruebas mediante Bruno.
-
-Todo el código generado fue revisado, adaptado y probado manualmente antes de ser incorporado al proyecto.
+De esta manera los comprobantes permanecen disponibles independientemente del ciclo de vida del servidor donde se ejecuta la API.
